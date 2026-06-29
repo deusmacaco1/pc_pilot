@@ -6,8 +6,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PC Part Tracker",
-  description: "Find the best PC parts at the best prices",
+  title: "PC Pilot",
+  description: "Stop guessing - Find the right hardware",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
