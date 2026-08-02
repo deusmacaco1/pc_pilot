@@ -11,6 +11,8 @@ interface FilterBarProps {
   setSocket: (val: string) => void;
   resolution: string;
   setResolution: (val: string) => void;
+  refreshRate: number | null;
+  setRefreshRate: (val: number | null) => void;
   useCases: string[];
   setUseCases: (val: string[]) => void;
   gpuModel: string;
@@ -125,6 +127,8 @@ export default function FilterBar({
   setSocket,
   resolution,
   setResolution,
+  refreshRate,
+  setRefreshRate,
   useCases,
   setUseCases,
   gpuModel,
@@ -138,13 +142,27 @@ export default function FilterBar({
     );
   };
 
-  const currentBrands = category === "GPU" ? gpuBrands : cpuBrands;
-  const currentUseCases =
-    category === "GPU" ? gpuUseCases : cpuUseCases;
+  const handleHzChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    if (rawVal === "") {
+      setRefreshRate(null);
+      return;
+    }
+    const parsed = parseInt(rawVal, 10);
+    if (isNaN(parsed)) {
+      setRefreshRate(null);
+      return;
+    }
+    // Clamp to valid monitor refresh rate bounds
+    const clamped = Math.min(Math.max(parsed, 30), 600);
+    setRefreshRate(clamped);
+  };
 
-  const sliderMax = category === "GPU" ? 20000 : 20000;
-  const sliderMaxLabel =
-    category === "GPU" ? "$20,000" : "$20,000";
+  const currentBrands = category === "GPU" ? gpuBrands : cpuBrands;
+  const currentUseCases = category === "GPU" ? gpuUseCases : cpuUseCases;
+
+  const sliderMax = 20000;
+  const sliderMaxLabel = "$20,000";
 
   return (
     <div className="w-full flex flex-col gap-8 px-8 py-8 border-b border-[#1a1a1a]">
@@ -164,7 +182,6 @@ export default function FilterBar({
                   setCategory(cat);
                   setBrand("All");
                   setSocket("All");
-                  setResolution("All");
                   setUseCases([]);
                 }}
               />
@@ -208,17 +225,33 @@ export default function FilterBar({
 
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
-            Resolution
+            Resolution & Target Hz
           </h3>
-          <div className="flex gap-2">
-            {resolutions.map((r) => (
-              <FilterButton
-                key={r}
-                label={r}
-                active={resolution === r}
-                onClick={() => setResolution(r)}
+          <div className="flex items-center gap-3">
+            {/* Resolution Buttons */}
+            <div className="flex gap-2">
+              {resolutions.map((r) => (
+                <FilterButton
+                  key={r}
+                  label={r}
+                  active={resolution === r}
+                  onClick={() => setResolution(r)}
+                />
+              ))}
+            </div>
+
+            {/* Seamless Inline Refresh Rate Input */}
+            <div className="relative flex items-center">
+              <input
+                type="number"
+                min={30}
+                max={600}
+                placeholder="Hz (e.g. 240)"
+                value={refreshRate ?? ""}
+                onChange={handleHzChange}
+                className="w-32 bg-[#111] border border-[#222] rounded-lg px-3 py-2 text-sm text-white placeholder-[#444] focus:outline-none focus:border-[#444] transition-colors"
               />
-            ))}
+            </div>
           </div>
         </div>
       </div>
