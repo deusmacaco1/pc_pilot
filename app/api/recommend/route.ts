@@ -1,183 +1,465 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { products, filters } = await req.json();
+  try {
+    const { products, filters } = await req.json();
 
-  const prompt = `
-You are a PC hardware expert acting as a silent ranking engine.
+    if (!Array.isArray(products) || !filters) {
+      return NextResponse.json(
+        { rankedIds: [], error: "Invalid request data" },
+        { status: 400 }
+      );
+    }
 
-The user wants a ${filters.category} with these preferences:
-- Budget: up to $${filters.maxPrice}
-- Brand: ${filters.brand}
-${filters.category === "CPU" ? `- Socket: ${filters.socket}` : ""}
-- Resolution: ${filters.resolution}
-- Use Cases: ${filters.useCases.length > 0 ? filters.useCases.join(", ") : "General use"}
-${filters.gpuModel ? `- Their GPU: ${filters.gpuModel}` : ""}
+    const category = filters.category;
+    const maxPrice = filters.maxPrice;
+    const brand = filters.brand;
+    const socket = filters.socket;
+    const resolution = filters.resolution;
+    const refreshRate = filters.refreshRate;
+    const useCases = Array.isArray(filters.useCases)
+      ? filters.useCases
+      : [];
+    const gpuModel = filters.gpuModel || "";
 
----
+    /*
+     * DISPLAY EXPERIENCE
+     *
+     * Higher refresh rate = more CPU importance.
+     * Higher resolution = more GPU importance.
+     */
 
-STEP 1 — DETERMINE REQUIRED PERFORMANCE TIER FROM USE CASES:
+    let cpuWeight = 50;
+    let gpuWeight = 50;
+    let displayProfile = "Balanced CPU/GPU";
 
-Before ranking anything, assess what performance tier the user's use cases actually demand.
-Do NOT default to high-end just because the budget allows it — match the tier to the workload.
+    if (resolution === "1080p") {
+      if (refreshRate !== null && refreshRate >= 360) {
+        cpuWeight = 85;
+        gpuWeight = 15;
+        displayProfile = "Extreme CPU priority";
+      } else if (refreshRate !== null && refreshRate >= 240) {
+        cpuWeight = 75;
+        gpuWeight = 25;
+        displayProfile = "Strong CPU priority";
+      } else {
+        cpuWeight = 65;
+        gpuWeight = 35;
+        displayProfile = "CPU-leaning";
+      }
+    } else if (resolution === "1440p") {
+      if (refreshRate !== null && refreshRate >= 360) {
+        cpuWeight = 70;
+        gpuWeight = 30;
+        displayProfile = "Strong CPU priority";
+      } else if (refreshRate !== null && refreshRate >= 240) {
+        cpuWeight = 60;
+        gpuWeight = 40;
+        displayProfile = "CPU/GPU balanced with CPU emphasis";
+      } else if (refreshRate !== null && refreshRate >= 144) {
+        cpuWeight = 50;
+        gpuWeight = 50;
+        displayProfile = "Balanced CPU/GPU";
+      } else {
+        cpuWeight = 40;
+        gpuWeight = 60;
+        displayProfile = "GPU-leaning";
+      }
+    } else if (resolution === "4K") {
+      if (refreshRate !== null && refreshRate >= 240) {
+        cpuWeight = 30;
+        gpuWeight = 70;
+        displayProfile = "Extreme GPU priority";
+      } else if (refreshRate !== null && refreshRate >= 144) {
+        cpuWeight = 25;
+        gpuWeight = 75;
+        displayProfile = "Strong GPU priority";
+      } else {
+        cpuWeight = 20;
+        gpuWeight = 80;
+        displayProfile = "Extreme GPU priority";
+      }
+    }
 
-${filters.category === "GPU" ? `
-GPU workload tiers:
+    if (resolution === "All" && refreshRate === null) {
+      cpuWeight = 50;
+      gpuWeight = 50;
+      displayProfile = "No specific display target";
+    }
 
-LIGHT (budget/mid-range cards are ideal — RX 6600, RTX 4060 and below):
-- Esports / competitive gaming: high FPS at 1080p low-medium settings, raw FPS > visual fidelity.
-- General gaming at 1080p: mid-range is the sweet spot, overkill cards waste budget.
-- Office / general use: integrated graphics or entry-level discrete only.
+    /*
+     * REFRESH RATE RULES
+     */
 
-MEDIUM (mid-to-upper-mid cards — RTX 4070, RX 7700 XT range):
-- AAA/Story games at 1080p–1440p: balance rasterization and price per frame.
-- Content creation / video editing: prioritize VRAM (10GB+), encode/decode engines, driver maturity.
-- CAD & Engineering: stable drivers and viewport performance, VRAM over raw compute.
-- Streaming: encode/decode engine matters more than raw GPU power.
+    let refreshRules = "No specific refresh-rate requirement.";
 
-HIGH (high-end cards — RTX 4080, RX 7900 XT and above):
-- AAA/Story games at 4K: prioritize rasterization headroom and VRAM (16GB+).
-- 3D Rendering: maximize VRAM and compute (CUDA cores / stream processors).
-- AI/ML: VRAM 16GB+ is mandatory, tensor performance, NVIDIA strongly preferred for CUDA.
-- Workstation: stability, compute, professional driver support. Pro cards acceptable here only.
+    if (refreshRate !== null) {
+      if (refreshRate >= 360) {
+        refreshRules = `
+- 360Hz+ is an extreme high-refresh target.
+- Strongly prioritize top-tier gaming CPUs.
+- Prioritize single-core performance, IPC, cache, frame-time consistency,
+  and 1% lows.
+- Weak entry-level and mid-range CPUs should be heavily penalized.
+`;
+      } else if (refreshRate >= 240) {
+        refreshRules = `
+- 240Hz+ is a high-refresh target.
+- Favor strong modern gaming CPUs.
+- Prioritize frame-time consistency and 1% lows.
+`;
+      } else if (refreshRate >= 144) {
+        refreshRules = `
+- 144Hz+ is a high-refresh target.
+- Favor hardware capable of maintaining high and stable frame rates.
+`;
+      }
+    }
 
-EXCLUSION RULE: NEVER recommend workstation/professional cards (RTX Ada, A-series, L-series) for any gaming or esports use case regardless of budget.
-` : `
-CPU workload tiers:
+    /*
+     * GPU PAIRING
+     */
 
-LIGHT (budget/mid-range — Ryzen 5 / i5 current gen is the ceiling):
-- General use and office work: efficiency and value, raw performance not needed.
-- Light gaming at 1080p: clock speed matters, but mid-range is more than enough.
-- Streaming (software-only, casual): a few extra cores help but budget chips are fine.
+    const gpuPairingRules = gpuModel
+      ? `
+The user currently has this GPU:
 
-MEDIUM (mid-to-upper-mid — Ryzen 5 high-end / Ryzen 7 low-end / i5 high-end / i7 low-end):
-- Gaming at 1080p–1440p: strong single-threaded speed, 6–8 cores ideal.
-- Content creation / video editing (non-professional): multi-threaded performance, 8–12 cores.
-- Streaming (dedicated stream PC or dual-purpose): more cores help, i7/Ryzen 7 range.
-- CAD & Engineering: single-threaded stability, mid-range is sufficient.
+"${gpuModel}"
 
-HIGH (high-end only — Ryzen 9 / i9 / Ryzen 7 top-end / i7 top-end):
-- Professional video editing / heavy content creation: maximize core count and memory bandwidth.
-- 3D Rendering: core count is king, more threads = faster renders.
-- AI/ML: core count, memory bandwidth, platform support (AMD vs Intel matters here).
-- VMs: thread count is the primary constraint, go as high as budget allows.
-- Workstation: ECC support, reliability, sustained multi-threaded throughput.
-- Heavy gaming + streaming simultaneously: needs headroom, high-end mid or better.
-`}
+When recommending a CPU, avoid severe CPU bottlenecks.
+At lower resolutions and higher refresh rates, CPU performance becomes
+more important.
+At 4K, GPU performance generally becomes more dominant.
+`
+      : "No external GPU was provided.";
 
----
+    /*
+     * WORKLOADS
+     */
 
-STEP 2 — RESOLUTION MODIFIER:
+    const workloadText =
+      useCases.length > 0 ? useCases.join(", ") : "General Use";
 
-Adjust the required tier upward if the resolution demands it:
-- 1080p: no adjustment, use the tier from Step 1 as-is.
-- 1440p: if the use case lands in LIGHT, push to MEDIUM minimum. MEDIUM stays MEDIUM.
-- 4K: if the use case lands in LIGHT or MEDIUM, push to HIGH minimum. Anything below HIGH at 4K is a poor recommendation.
+    /*
+     * PRODUCTS
+     *
+     * Keep the existing product format for compatibility.
+     */
 
-${filters.gpuModel ? `
----
+    const productList = products
+      .map(
+        (p: any) =>
+          `ID=${p.id} | ${p.name} | $${p.price}`
+      )
+      .join("\n");
 
-STEP 3 — BOTTLENECK CHECK (only after Steps 1 and 2 are resolved):
+    const validIds = products.map((p: any) => p.id);
 
-The user owns a ${filters.gpuModel}. After determining the correct performance tier from use cases and resolution, verify the recommended CPU is not a bottleneck for this GPU.
+    /*
+     * GROQ PROMPT
+     */
 
-GPU tier classification for bottleneck purposes:
-- Entry-level (GTX 1650, RX 6500 XT, etc.): any modern mid-range CPU is sufficient.
-- Mid-range (RTX 4060, RX 7600, RTX 3070, etc.): minimum Ryzen 5 7600X / i5-13600K.
-- High-end (RTX 4080, RX 7900 XT, RTX 3090, etc.): minimum Ryzen 7 7700X / i7-13700K.
-- Flagship (RTX 4090, RTX 5080, RTX 5090, RX 7900 XTX, etc.): minimum Ryzen 9 / i9 / top-end i7. An i3 or i5 of ANY generation paired with a ${filters.gpuModel} is an automatic disqualification from top rankings.
+    const prompt = `
+You are PC Pilot's flagship AI Recommendation Engine,
+a world-class PC hardware engineer and market analyst.
 
-Classify ${filters.gpuModel} into the correct tier and enforce its minimum CPU floor.
-If the use case tier from Steps 1–2 already meets or exceeds the bottleneck minimum, no change needed.
-If the bottleneck minimum is HIGHER than the use case tier, raise the floor to match — but only as much as needed, do not over-correct.
-At ${filters.resolution}, bottleneck risk is ${filters.resolution === "4K" ? "lower (GPU-bound workload) — apply bottleneck rules but weight them slightly less aggressively" : filters.resolution === "1440p" ? "significant — enforce bottleneck minimum strictly" : "high — enforce bottleneck minimum strictly at 1080p where CPU is the limiting factor"}.
-` : ""}
+The user wants a ${category} recommendation.
 
----
+USER REQUIREMENTS:
 
-FINAL RANKING RULES:
-1. Use case fit is the primary ranking signal — a perfectly matched cheaper option beats an overpowered expensive one.
-2. Never recommend more hardware than the workload justifies, even if the budget allows it.
-3. Budget is a ceiling, not a target — do not pad recommendations toward the cap without justification.
-4. Options that violate the tier floor from any step above must be ranked at the bottom.
-5. Within the correct tier, rank by best price-to-performance for the specific use cases chosen.
+- Budget Ceiling: up to $${maxPrice}
+- Brand Preference: ${brand}
+${category === "CPU" ? `- Socket Preference: ${socket}` : ""}
+- Resolution Target: ${resolution}
+- Refresh Rate Target: ${
+      refreshRate !== null ? `${refreshRate} Hz` : "Not specified"
+    }
+- Workloads / Use Cases: ${workloadText}
+${gpuModel ? `- Paired GPU: ${gpuModel}` : ""}
 
-Here are the available products with their IDs:
-${products
-  .map((p: any, i: number) => `${i + 1}. ID=${p.id} | ${p.name} | $${p.price}`)
-  .join("\n")}
+DISPLAY EXPERIENCE PROFILE:
 
-The ONLY valid IDs you can use are: [${products.map((p: any) => p.id).join(", ")}]
+- ${displayProfile}
+- CPU Priority: ${cpuWeight}%
+- GPU Priority: ${gpuWeight}%
 
-Rank ALL of these products from best to worst for the specified use case(s).
+IMPORTANT DISPLAY LOGIC:
+
+Higher refresh rates increase the importance of CPU performance,
+especially at 1080p and 1440p.
+
+Higher resolutions increase the importance of GPU performance.
+
+Never evaluate refresh rate independently from resolution.
+
+For example:
+
+- 1080p 360Hz = heavily CPU-focused
+- 1080p 240Hz = CPU-focused
+- 1440p 240Hz = balanced with CPU emphasis
+- 4K 60Hz = heavily GPU-focused
+- 4K 144Hz = strongly GPU-focused
+- 4K 240Hz = extremely GPU-demanding while still requiring an adequate CPU
+
+${refreshRules}
+
+${gpuPairingRules}
+
+WORKLOAD PRIORITIES:
+
+- Gaming / Esports:
+  Prioritize gaming performance, frame-time consistency and 1% lows.
+
+- AAA / Story Games:
+  Consider both CPU and GPU performance, with resolution heavily
+  affecting GPU importance.
+
+- AI / Machine Learning:
+  For GPUs, prioritize VRAM and compute capability.
+  For CPUs, prioritize thread count and relevant instruction support.
+
+- 3D Rendering:
+  Prioritize multi-core CPU performance or GPU compute performance
+  depending on the category.
+
+- Video Editing / Content Creation:
+  Consider multi-core performance, media capabilities and platform
+  performance.
+
+- CAD / Engineering:
+  Consider strong single-threaded performance as well as adequate
+  multi-core performance.
+
+- General Use:
+  Favor good value and avoid unnecessary overkill.
+
+RANKING PRIORITIES:
+
+1. Ability to satisfy the user's requirements
+2. Display target compatibility
+3. Workload compatibility
+4. Bottleneck avoidance
+5. Price-to-performance
+6. Budget compliance
+7. Brand and socket preference
 
 IMPORTANT:
-- Reply with ONLY a JSON array of IDs.
-- Do NOT use markdown.
-- Do NOT use \`\`\`json.
-- Do NOT explain anything.
+
+The budget is a STRICT MAXIMUM.
+
+Do NOT automatically recommend the most expensive product.
+
+A cheaper product should rank higher when it provides sufficient
+performance for the user's target while offering substantially better
+price-to-performance.
+
+Only rank an expensive flagship product first when its additional
+performance is actually useful for the user's target.
+
+Only rank products from the supplied product list.
+
+Do not invent products.
+
+AVAILABLE PRODUCTS:
+
+${productList}
+
+VALID IDS:
+
+[${validIds.join(", ")}]
+
+OUTPUT:
+
+Return ONLY a raw JSON array containing ranked product IDs.
 
 Example:
-[3,1,5,2,4]
+
+[78,12,405,22,11]
+
+Do not use Markdown.
+Do not use code fences.
+Do not include explanations.
+Do not invent IDs.
 `;
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a ranking engine. Respond ONLY with valid JSON. Never use markdown or code fences.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
+
+    /*
+     * GROQ REQUEST
+     */
+
+    const apiKey = process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+      console.error("GROQ_API_KEY is missing.");
+
+      return NextResponse.json(
+        { rankedIds: [], error: "GROQ_API_KEY is missing." },
+        { status: 500 }
+      );
     }
-  );
 
-  const data = await response.json();
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          temperature: 0.2,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a ranking engine. Respond ONLY with valid JSON. Never use Markdown or code fences.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        }),
+      }
+    );
 
-  console.log("FULL GROQ RESPONSE:");
-  console.log(JSON.stringify(data, null, 2));
+    /*
+     * GROQ API ERROR
+     */
 
-  const rawContent = data.choices?.[0]?.message?.content ?? "[]";
+    if (!response.ok) {
+      const errorText = await response.text();
 
-  console.log("RAW CONTENT:");
-  console.log(rawContent);
+      console.error(
+        "GROQ API ERROR:",
+        response.status,
+        errorText
+      );
 
-  const cleanedContent = rawContent
-    .replace(/json\s*/gi, "")
-    .replace(/\s*/g, "")
-    .trim();
+      return NextResponse.json(
+        {
+          rankedIds: [],
+          error: "Groq API request failed.",
+        },
+        { status: 500 }
+      );
+    }
 
-  console.log("CLEANED CONTENT:");
-  console.log(cleanedContent);
+    const data = await response.json();
 
-  try {
-    const rankedIds = JSON.parse(cleanedContent);
+    console.log("FULL GROQ RESPONSE:");
+    console.log(JSON.stringify(data, null, 2));
+
+    const rawContent =
+      data.choices?.[0]?.message?.content ?? "";
+
+    console.log("RAW CONTENT:");
+    console.log(rawContent);
+
+    if (!rawContent) {
+      return NextResponse.json({
+        rankedIds: [],
+      });
+    }
+
+    /*
+     * CLEAN GROQ JSON
+     *
+     * Handles:
+     *
+     * [1,2,3]
+     *
+     * and:
+     *
+     * ```json
+     * [1,2,3]
+     * ```
+     */
+
+    let cleanedContent = rawContent.trim();
+
+    cleanedContent = cleanedContent
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    const firstBracket = cleanedContent.indexOf("[");
+    const lastBracket = cleanedContent.lastIndexOf("]");
+
+    if (firstBracket !== -1 && lastBracket !== -1) {
+      cleanedContent = cleanedContent.substring(
+        firstBracket,
+        lastBracket + 1
+      );
+    }
+
+    console.log("CLEANED CONTENT:");
+    console.log(cleanedContent);
+
+    /*
+     * PARSE JSON
+     */
+
+    let parsedIds: any;
+
+    try {
+      parsedIds = JSON.parse(cleanedContent);
+    } catch (err) {
+      console.error("JSON PARSE FAILED:", err);
+
+      return NextResponse.json({
+        rankedIds: [],
+        rawContent,
+        cleanedContent,
+      });
+    }
+
+    /*
+     * VALIDATE ARRAY
+     */
+
+    if (!Array.isArray(parsedIds)) {
+      console.error("GROQ DID NOT RETURN AN ARRAY.");
+
+      return NextResponse.json({
+        rankedIds: [],
+        rawContent,
+        cleanedContent,
+      });
+    }
+
+    /*
+     * VALIDATE IDS
+     */
+
+    const validIdSet = new Set(validIds);
+
+    const rankedIds = parsedIds.filter((id: any) =>
+      validIdSet.has(id)
+    );
+
+    /*
+     * REMOVE DUPLICATES
+     */
+
+    const uniqueRankedIds = Array.from(new Set(rankedIds));
+
+    console.log("FINAL RANKED IDS:");
+    console.log(uniqueRankedIds);
 
     return NextResponse.json({
-      rankedIds,
+      rankedIds: uniqueRankedIds,
     });
-  } catch (err) {
-    console.error("JSON PARSE FAILED:", err);
+  } catch (error) {
+    console.error("RECOMMENDATION API ERROR:", error);
 
-    return NextResponse.json({
-      rankedIds: [],
-      rawContent,
-      cleanedContent,
-      debug: data,
-    });
+    return NextResponse.json(
+      {
+        rankedIds: [],
+        error: "Recommendation engine failed.",
+      },
+      { status: 500 }
+    );
   }
 }

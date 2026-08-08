@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect,} from "react";
+
 interface FilterBarProps {
   maxPrice: number;
   setMaxPrice: (val: number) => void;
@@ -134,28 +136,49 @@ export default function FilterBar({
   gpuModel,
   setGpuModel,
 }: FilterBarProps) {
+  const [localHz, setLocalHz] = useState<string>(refreshRate ? refreshRate.toString() : "");
+
+  useEffect(() => {
+    setLocalHz(refreshRate ? refreshRate.toString() : "");
+  }, [refreshRate]);
+
+  const commitHz = () => {
+  if (localHz === "") {
+    setRefreshRate(null);
+    return;
+  }
+
+  const parsed = parseInt(localHz, 10);
+
+  if (isNaN(parsed)) {
+    setRefreshRate(null);
+    setLocalHz("");
+    return;
+  }
+
+  if (parsed < 30 || parsed > 600) {
+    setRefreshRate(null);
+    setLocalHz("");
+    return;
+  }
+
+  setLocalHz(parsed.toString());
+  setRefreshRate(parsed);
+};
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      commitHz();
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
   const toggleUseCase = (uc: string) => {
     setUseCases(
       useCases.includes(uc)
         ? useCases.filter((u) => u !== uc)
         : [...useCases, uc]
     );
-  };
-
-  const handleHzChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawVal = e.target.value;
-    if (rawVal === "") {
-      setRefreshRate(null);
-      return;
-    }
-    const parsed = parseInt(rawVal, 10);
-    if (isNaN(parsed)) {
-      setRefreshRate(null);
-      return;
-    }
-    // Clamp to valid monitor refresh rate bounds
-    const clamped = Math.min(Math.max(parsed, 30), 600);
-    setRefreshRate(clamped);
   };
 
   const currentBrands = category === "GPU" ? gpuBrands : cpuBrands;
@@ -167,7 +190,8 @@ export default function FilterBar({
   return (
     <div className="w-full flex flex-col gap-8 px-8 py-8 border-b border-[#1a1a1a]">
       {/* Row 1 */}
-      <div className="flex flex-wrap gap-10">
+      <div className="flex flex-wrap gap-10 items-start">
+        {/* Category */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
             Category
@@ -189,6 +213,7 @@ export default function FilterBar({
           </div>
         </div>
 
+        {/* Brand */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
             Brand
@@ -205,6 +230,7 @@ export default function FilterBar({
           </div>
         </div>
 
+        {/* Socket */}
         {category === "CPU" && (
           <div className="flex flex-col gap-3">
             <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
@@ -223,35 +249,40 @@ export default function FilterBar({
           </div>
         )}
 
+        {/* Resolution Column */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
-            Resolution & Target Hz
+            Resolution
           </h3>
-          <div className="flex items-center gap-3">
-            {/* Resolution Buttons */}
-            <div className="flex gap-2">
-              {resolutions.map((r) => (
-                <FilterButton
-                  key={r}
-                  label={r}
-                  active={resolution === r}
-                  onClick={() => setResolution(r)}
-                />
-              ))}
-            </div>
-
-            {/* Seamless Inline Refresh Rate Input */}
-            <div className="relative flex items-center">
-              <input
-                type="number"
-                min={30}
-                max={600}
-                placeholder="Hz (e.g. 240)"
-                value={refreshRate ?? ""}
-                onChange={handleHzChange}
-                className="w-32 bg-[#111] border border-[#222] rounded-lg px-3 py-2 text-sm text-white placeholder-[#444] focus:outline-none focus:border-[#444] transition-colors"
+          <div className="flex gap-2">
+            {resolutions.map((r) => (
+              <FilterButton
+                key={r}
+                label={r}
+                active={resolution === r}
+                onClick={() => setResolution(r)}
               />
-            </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Target Hz Column - Positioned Side-by-Side */}
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
+            Target Refresh Rate
+          </h3>
+          <div className="relative flex items-center">
+            <input
+              type="number"
+              min={30}
+              max={600}
+              placeholder="Hz (e.g. 240)"
+              value={localHz}
+              onChange={(e) => setLocalHz(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={commitHz}
+              className="w-36 bg-[#111] border border-[#222] rounded-lg px-3 py-2 text-sm text-white placeholder-[#444] focus:outline-none focus:border-[#555] transition-colors"
+            />
           </div>
         </div>
       </div>
