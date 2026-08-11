@@ -24,7 +24,6 @@ category,
 }: ProductCardProps) {
 return ( <div className="group bg-[#111111] border border-[#222222] rounded-xl overflow-hidden hover:border-[#444444] transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.05)] flex flex-col">
 
-```
   {/* Product Image */}
   <div className="relative bg-[#0d0d0d] h-48 flex items-center justify-center p-4">
     {product.image_url ? (
