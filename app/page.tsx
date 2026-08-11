@@ -37,7 +37,7 @@ export default function Home() {
   const cache = useRef<Record<string, number[]>>({});
 
   // Reset category-specific filters when category changes
-  // (Resolution & Target Hz are preserved!)
+  // Resolution & Target Hz are preserved
   useEffect(() => {
     setUseCases([]);
     setBrand("All");
@@ -47,31 +47,71 @@ export default function Home() {
 
   // Fetch and rank products
   useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
 
     debounceTimer.current = setTimeout(async () => {
       setLoading(true);
 
-      // 1. Build Supabase query - limit set to 1500 so ALL database rows are fetched
+      /*
+       * CATEGORY-SPECIFIC TABLE
+       *
+       * CPU → cpus
+       * GPU → gpus
+       */
+      const tableName = category === "CPU" ? "cpus" : "gpus";
+
       let query = supabase
-        .from("products")
+        .from(tableName)
         .select("*")
-        .lte("price", maxPrice)
-        .eq("category", category);
+        .lte("price", maxPrice);
 
-      if (brand !== "All") query = query.eq("brand", brand);
-      if (socket !== "All") query = query.eq("socket", socket);
+      /*
+       * BRAND FILTER
+       */
+      if (brand !== "All") {
+        query = query.eq("brand", brand);
+      }
 
+      /*
+       * SOCKET FILTER
+       *
+       * Socket only exists in the CPU table.
+       */
+      if (category === "CPU" && socket !== "All") {
+        query = query.eq("socket", socket);
+      }
+
+      /*
+       * FETCH PRODUCTS
+       */
       const { data, error } = await query
         .order("price", { ascending: true })
         .limit(1500);
 
-      if (error || !data) {
+      if (error) {
+        console.error("SUPABASE ERROR:", error);
+        setProducts([]);
         setLoading(false);
         return;
       }
 
-      // 2. If no smart filters active, render all results sorted by price directly
+      if (!data) {
+        console.error("SUPABASE RETURNED NO DATA");
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log(
+        `Loaded ${data.length} ${category} products from ${tableName}`
+      );
+
+      /*
+       * If no smart filters are active,
+       * render all results sorted by price directly.
+       */
       const hasFilters =
         resolution !== "All" ||
         refreshRate !== null ||
@@ -84,7 +124,12 @@ export default function Home() {
         return;
       }
 
-      // 3. Check cache first
+      /*
+       * CACHE KEY
+       *
+       * Category is included so CPU and GPU
+       * recommendations remain separate.
+       */
       const cacheKey = JSON.stringify({
         category,
         maxPrice,
@@ -98,21 +143,32 @@ export default function Home() {
 
       if (cache.current[cacheKey]) {
         const rankedIds = cache.current[cacheKey];
+
         const ranked = rankedIds
           .map((id: number) => data.find((p) => p.id === id))
           .filter(Boolean);
-        const unranked = data.filter((p) => !rankedIds.includes(p.id));
+
+        const unranked = data.filter(
+          (p) => !rankedIds.includes(p.id)
+        );
 
         setProducts([...ranked, ...unranked]);
         setLoading(false);
         return;
       }
 
-      // 4. Send to API to rank (slice to top 150 to keep Groq fast & under token caps)
+      /*
+       * SEND PRODUCTS TO AI RANKER
+       *
+       * Limit to top 150 products to keep Groq fast
+       * and avoid unnecessary token usage.
+       */
       try {
         const res = await fetch("/api/recommend", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             products: data.slice(0, 150),
             filters: {
@@ -128,22 +184,43 @@ export default function Home() {
           }),
         });
 
+        if (!res.ok) {
+          console.error(
+            "RECOMMENDATION API FAILED:",
+            res.status
+          );
+
+          setProducts(data);
+          setLoading(false);
+          return;
+        }
+
         const { rankedIds } = await res.json();
 
         if (Array.isArray(rankedIds) && rankedIds.length > 0) {
           cache.current[cacheKey] = rankedIds;
 
           const ranked = rankedIds
-            .map((id: number) => data.find((p) => p.id === id))
+            .map((id: number) =>
+              data.find((p) => p.id === id)
+            )
             .filter(Boolean);
 
-          const unranked = data.filter((p) => !rankedIds.includes(p.id));
+          const unranked = data.filter(
+            (p) => !rankedIds.includes(p.id)
+          );
 
           setProducts([...ranked, ...unranked]);
         } else {
           setProducts(data);
         }
-      } catch {
+      } catch (error) {
+        console.error(
+          "RECOMMENDATION REQUEST ERROR:",
+          error
+        );
+
+        // If AI ranking fails, still show the products.
         setProducts(data);
       }
 
@@ -151,7 +228,9 @@ export default function Home() {
     }, 800);
 
     return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
     };
   }, [
     maxPrice,
@@ -170,8 +249,12 @@ export default function Home() {
       <header className="border-b border-[#1a1a1a] px-8 py-5 flex items-center justify-between sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-white"></div>
-          <span className="font-bold text-lg tracking-tight">PC Pilot</span>
+
+          <span className="font-bold text-lg tracking-tight">
+            PC Pilot
+          </span>
         </div>
+
         <span className="text-xs text-[#444] tracking-widest uppercase">
           Find Your Build
         </span>
@@ -183,8 +266,10 @@ export default function Home() {
           Stop guessing, <br />
           find the right hardware.
         </h1>
+
         <p className="text-[#555] text-base">
-          Personalized recommendations tailored to how you actually use your PC.
+          Personalized recommendations tailored to how you actually use your
+          PC.
         </p>
       </div>
 
@@ -222,6 +307,7 @@ export default function Home() {
         ) : products.length === 0 ? (
           <div className="text-center py-32 text-[#444]">
             <p className="text-4xl mb-3">◻</p>
+
             <p className="text-sm">
               No parts found. Try adjusting your filters.
             </p>
@@ -231,9 +317,14 @@ export default function Home() {
             <p className="text-xs text-[#444] mb-5 tracking-widest uppercase">
               {products.length} results
             </p>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {products.map((p, index) => (
-                <ProductCard key={`${p.id}-${index}`} product={p} />
+                <ProductCard
+                  key={`${p.id}-${index}`}
+                  product={p}
+                  category={category}
+                />
               ))}
             </div>
           </>
