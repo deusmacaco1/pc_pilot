@@ -152,8 +152,8 @@ At 4K, GPU performance generally becomes more dominant.
     /*
      * PRODUCT INFORMATION
      *
-     * CPU products contain additional CPU-specific specifications.
-     * GPU products currently contain the generic product fields only.
+     * CPU and GPU products each contain their own category-specific
+     * specifications.
      */
 
     const productList = products
@@ -177,6 +177,18 @@ At 4K, GPU performance generally becomes more dominant.
           `Name=${p.name}`,
           `Price=$${p.price}`,
           `Brand=${p.brand ?? "Unknown"}`,
+          `VRAM=${p.vram ?? "Unknown"}`,
+          `Memory Bus=${p.memory_bus ?? "Unknown"}`,
+          `TDP=${p.gpu_tdp ?? "Unknown"}`,
+          `Ray Tracing=${
+            p.ray_tracing === true
+              ? "Yes"
+              : p.ray_tracing === false
+              ? "No"
+              : "Unknown"
+          }`,
+          `Upscaling=${p.upscaling_tech ?? "Unknown"}`,
+          `PassMark G3D Mark=${p.gpu_benchmark_passmark ?? "Unknown"}`,
         ].join(" | ");
       })
       .join("\n");
@@ -280,13 +292,21 @@ workstation workloads and heavy multitasking.
 
 GPU-SPECIFIC INFORMATION:
 
-The current GPU database provides:
-- Brand
-- Product name
-- Price
+When recommending GPUs, use the supplied:
+- VRAM (capacity and type)
+- Memory Bus width
+- TDP
+- Ray Tracing hardware support
+- Upscaling technology (DLSS / FSR / XeSS / None)
+- PassMark G3D Mark benchmark
 
-Do not invent GPU specifications that are not present in the supplied
-product data.
+PassMark G3D Mark is the primary indicator of raw GPU performance.
+VRAM capacity matters most for high resolutions, AI/ML workloads and
+content creation. Ray tracing and upscaling support matter most for
+modern AAA gaming.
+
+Some fields may be "Unknown" for a given GPU. Do not invent GPU
+specifications that are not present in the supplied product data.
 
 RANKING PRIORITIES:
 
