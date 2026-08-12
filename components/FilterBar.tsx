@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect,} from "react";
+import { useState, useEffect } from "react";
 
 interface FilterBarProps {
   maxPrice: number;
@@ -23,8 +23,22 @@ interface FilterBarProps {
 
 const cpuBrands = ["All", "Intel", "AMD"];
 const gpuBrands = ["All", "NVIDIA", "AMD", "Intel"];
-const sockets = ["All", "AM5", "AM4", "LGA1851", "LGA1700", "sTR5"];
-const resolutions = ["All", "1080p", "1440p", "4K"];
+
+const sockets = [
+  "All",
+  "AM5",
+  "AM4",
+  "LGA1851",
+  "LGA1700",
+  "sTR5",
+];
+
+const resolutions = [
+  "All",
+  "1080p",
+  "1440p",
+  "4K",
+];
 
 const cpuUseCases = [
   "Gaming",
@@ -81,7 +95,10 @@ function UseCaseCheckbox({
   onClick: () => void;
 }) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer group" onClick={onClick}>
+    <label
+      className="flex items-center gap-3 cursor-pointer group"
+      onClick={onClick}
+    >
       <div
         className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-all duration-200 ${
           checked
@@ -105,6 +122,7 @@ function UseCaseCheckbox({
           </svg>
         )}
       </div>
+
       <span
         className={`text-base transition-colors duration-200 ${
           checked
@@ -136,37 +154,43 @@ export default function FilterBar({
   gpuModel,
   setGpuModel,
 }: FilterBarProps) {
-  const [localHz, setLocalHz] = useState<string>(refreshRate ? refreshRate.toString() : "");
+  const [localHz, setLocalHz] = useState<string>(
+    refreshRate ? refreshRate.toString() : ""
+  );
 
   useEffect(() => {
-    setLocalHz(refreshRate ? refreshRate.toString() : "");
+    setLocalHz(
+      refreshRate ? refreshRate.toString() : ""
+    );
   }, [refreshRate]);
 
   const commitHz = () => {
-  if (localHz === "") {
-    setRefreshRate(null);
-    return;
-  }
+    if (localHz === "") {
+      setRefreshRate(null);
+      return;
+    }
 
-  const parsed = parseInt(localHz, 10);
+    const parsed = parseInt(localHz, 10);
 
-  if (isNaN(parsed)) {
-    setRefreshRate(null);
-    setLocalHz("");
-    return;
-  }
+    if (isNaN(parsed)) {
+      setRefreshRate(null);
+      setLocalHz("");
+      return;
+    }
 
-  if (parsed < 30 || parsed > 600) {
-    setRefreshRate(null);
-    setLocalHz("");
-    return;
-  }
+    if (parsed < 30 || parsed > 600) {
+      setRefreshRate(null);
+      setLocalHz("");
+      return;
+    }
 
-  setLocalHz(parsed.toString());
-  setRefreshRate(parsed);
-};
+    setLocalHz(parsed.toString());
+    setRefreshRate(parsed);
+  };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
     if (e.key === "Enter") {
       commitHz();
       (e.target as HTMLInputElement).blur();
@@ -181,8 +205,13 @@ export default function FilterBar({
     );
   };
 
-  const currentBrands = category === "GPU" ? gpuBrands : cpuBrands;
-  const currentUseCases = category === "GPU" ? gpuUseCases : cpuUseCases;
+  const currentBrands =
+    category === "GPU" ? gpuBrands : cpuBrands;
+
+  const currentUseCases =
+    category === "GPU"
+      ? gpuUseCases
+      : cpuUseCases;
 
   const sliderMax = 20000;
   const sliderMaxLabel = "$20,000";
@@ -196,6 +225,7 @@ export default function FilterBar({
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
             Category
           </h3>
+
           <div className="flex gap-2">
             {["CPU", "GPU"].map((cat) => (
               <FilterButton
@@ -218,6 +248,7 @@ export default function FilterBar({
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
             Brand
           </h3>
+
           <div className="flex gap-2">
             {currentBrands.map((b) => (
               <FilterButton
@@ -236,6 +267,7 @@ export default function FilterBar({
             <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
               Socket
             </h3>
+
             <div className="flex gap-2">
               {sockets.map((s) => (
                 <FilterButton
@@ -249,11 +281,12 @@ export default function FilterBar({
           </div>
         )}
 
-        {/* Resolution Column */}
+        {/* Resolution */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
             Resolution
           </h3>
+
           <div className="flex gap-2">
             {resolutions.map((r) => (
               <FilterButton
@@ -266,11 +299,12 @@ export default function FilterBar({
           </div>
         </div>
 
-        {/* Target Hz Column - Positioned Side-by-Side */}
+        {/* Target Hz */}
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
             Target Refresh Rate
           </h3>
+
           <div className="relative flex items-center">
             <input
               type="number"
@@ -278,7 +312,9 @@ export default function FilterBar({
               max={600}
               placeholder="Hz (e.g. 240)"
               value={localHz}
-              onChange={(e) => setLocalHz(e.target.value)}
+              onChange={(e) =>
+                setLocalHz(e.target.value)
+              }
               onKeyDown={handleKeyDown}
               onBlur={commitHz}
               className="w-36 bg-[#111] border border-[#222] rounded-lg px-3 py-2 text-sm text-white placeholder-[#444] focus:outline-none focus:border-[#555] transition-colors"
@@ -293,6 +329,7 @@ export default function FilterBar({
           <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
             Max Price
           </h3>
+
           <span className="text-2xl font-bold text-white">
             ${maxPrice.toLocaleString()}
           </span>
@@ -305,7 +342,9 @@ export default function FilterBar({
           max={sliderMax}
           step={50}
           value={Math.min(maxPrice, sliderMax)}
-          onChange={(e) => setMaxPrice(Number(e.target.value))}
+          onChange={(e) =>
+            setMaxPrice(Number(e.target.value))
+          }
           className="w-full h-2 accent-white cursor-pointer"
         />
 
@@ -320,6 +359,7 @@ export default function FilterBar({
         <h3 className="text-sm font-semibold tracking-widest uppercase text-[#555]">
           Use Cases
         </h3>
+
         <div className="flex flex-wrap gap-x-10 gap-y-3">
           {currentUseCases.map((uc) => (
             <UseCaseCheckbox
@@ -350,7 +390,9 @@ export default function FilterBar({
             type="text"
             placeholder="e.g. RTX 4070"
             value={gpuModel}
-            onChange={(e) => setGpuModel(e.target.value)}
+            onChange={(e) =>
+              setGpuModel(e.target.value)
+            }
             className="w-full bg-[#111] border border-[#222] rounded-lg px-4 py-3 text-base text-white placeholder-[#444] focus:outline-none focus:border-[#444] transition-colors"
           />
         </div>

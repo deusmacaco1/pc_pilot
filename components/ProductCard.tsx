@@ -11,6 +11,13 @@ cpu_cores_threads?: string;
 cpu_boost_clock?: string;
 cpu_tdp?: string;
 cpu_benchmark_cinebench_r23_multi?: number | string;
+
+vram?: string;
+memory_bus?: string;
+gpu_tdp?: string;
+ray_tracing?: boolean;
+upscaling_tech?: string;
+gpu_benchmark_passmark?: number | string;
 }
 
 interface ProductCardProps {
@@ -90,6 +97,75 @@ return ( <div className="group bg-[#111111] border border-[#222222] rounded-xl o
             {product.cpu_benchmark_cinebench_r23_multi
               ? Number(
                   product.cpu_benchmark_cinebench_r23_multi
+                ).toLocaleString()
+              : "N/A"}
+          </span>
+        </div>
+
+      </div>
+    )}
+
+    {/* GPU Specifications */}
+    {category === "GPU" && (
+      <div className="border-t border-[#222] pt-3 flex flex-col gap-2">
+
+        <div className="flex justify-between gap-4">
+          <span className="text-xs text-[#666]">
+            VRAM:
+          </span>
+          <span className="text-xs text-[#aaa] font-medium text-right">
+            {product.vram || "N/A"}
+          </span>
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <span className="text-xs text-[#666]">
+            Memory Bus:
+          </span>
+          <span className="text-xs text-[#aaa] font-medium text-right">
+            {product.memory_bus || "N/A"}
+          </span>
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <span className="text-xs text-[#666]">
+            TDP:
+          </span>
+          <span className="text-xs text-[#aaa] font-medium text-right">
+            {product.gpu_tdp || "N/A"}
+          </span>
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <span className="text-xs text-[#666]">
+            Ray Tracing:
+          </span>
+          <span className="text-xs text-[#aaa] font-medium text-right">
+            {product.ray_tracing === true
+              ? "Yes"
+              : product.ray_tracing === false
+              ? "No"
+              : "N/A"}
+          </span>
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <span className="text-xs text-[#666]">
+            Upscaling:
+          </span>
+          <span className="text-xs text-[#aaa] font-medium text-right">
+            {product.upscaling_tech || "N/A"}
+          </span>
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <span className="text-xs text-[#666]">
+            PassMark G3D Mark:
+          </span>
+          <span className="text-xs text-[#aaa] font-medium text-right">
+            {product.gpu_benchmark_passmark
+              ? Number(
+                  product.gpu_benchmark_passmark
                 ).toLocaleString()
               : "N/A"}
           </span>

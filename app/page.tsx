@@ -90,6 +90,11 @@ export default function Home() {
         .order("price", { ascending: true })
         .limit(1500);
 
+      console.log("CATEGORY:", category);
+      console.log("TABLE:", tableName);
+      console.log("GPU/CPU DATA:", data);
+      console.log("SUPABASE ERROR:", error);  
+
       if (error) {
         console.error("SUPABASE ERROR:", error);
         setProducts([]);

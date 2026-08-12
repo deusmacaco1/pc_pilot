@@ -6,7 +6,10 @@ export async function POST(req: NextRequest) {
 
     if (!Array.isArray(products) || !filters) {
       return NextResponse.json(
-        { rankedIds: [], error: "Invalid request data" },
+        {
+          rankedIds: [],
+          error: "Invalid request data",
+        },
         { status: 400 }
       );
     }
@@ -17,9 +20,11 @@ export async function POST(req: NextRequest) {
     const socket = filters.socket;
     const resolution = filters.resolution;
     const refreshRate = filters.refreshRate;
+
     const useCases = Array.isArray(filters.useCases)
       ? filters.useCases
       : [];
+
     const gpuModel = filters.gpuModel || "";
 
     /*
@@ -55,7 +60,8 @@ export async function POST(req: NextRequest) {
       } else if (refreshRate !== null && refreshRate >= 240) {
         cpuWeight = 60;
         gpuWeight = 40;
-        displayProfile = "CPU/GPU balanced with CPU emphasis";
+        displayProfile =
+          "CPU/GPU balanced with CPU emphasis";
       } else if (refreshRate !== null && refreshRate >= 144) {
         cpuWeight = 50;
         gpuWeight = 50;
@@ -91,7 +97,8 @@ export async function POST(req: NextRequest) {
      * REFRESH RATE RULES
      */
 
-    let refreshRules = "No specific refresh-rate requirement.";
+    let refreshRules =
+      "No specific refresh-rate requirement.";
 
     if (refreshRate !== null) {
       if (refreshRate >= 360) {
@@ -138,19 +145,40 @@ At 4K, GPU performance generally becomes more dominant.
      */
 
     const workloadText =
-      useCases.length > 0 ? useCases.join(", ") : "General Use";
+      useCases.length > 0
+        ? useCases.join(", ")
+        : "General Use";
 
     /*
-     * PRODUCTS
+     * PRODUCT INFORMATION
      *
-     * Keep the existing product format for compatibility.
+     * CPU products contain additional CPU-specific specifications.
+     * GPU products currently contain the generic product fields only.
      */
 
     const productList = products
-      .map(
-        (p: any) =>
-          `ID=${p.id} | ${p.name} | $${p.price}`
-      )
+      .map((p: any) => {
+        if (category === "CPU") {
+          return [
+            `ID=${p.id}`,
+            `Name=${p.name}`,
+            `Price=$${p.price}`,
+            `Brand=${p.brand ?? "Unknown"}`,
+            `Socket=${p.socket ?? "Unknown"}`,
+            `Cores/Threads=${p.cpu_cores_threads ?? "Unknown"}`,
+            `Boost Clock=${p.cpu_boost_clock ?? "Unknown"}`,
+            `TDP=${p.cpu_tdp ?? "Unknown"}`,
+            `Cinebench R23 Multi=${p.cpu_benchmark_cinebench_r23_multi ?? "Unknown"}`,
+          ].join(" | ");
+        }
+
+        return [
+          `ID=${p.id}`,
+          `Name=${p.name}`,
+          `Price=$${p.price}`,
+          `Brand=${p.brand ?? "Unknown"}`,
+        ].join(" | ");
+      })
       .join("\n");
 
     const validIds = products.map((p: any) => p.id);
@@ -167,12 +195,15 @@ The user wants a ${category} recommendation.
 
 USER REQUIREMENTS:
 
+- Category: ${category}
 - Budget Ceiling: up to $${maxPrice}
 - Brand Preference: ${brand}
 ${category === "CPU" ? `- Socket Preference: ${socket}` : ""}
 - Resolution Target: ${resolution}
 - Refresh Rate Target: ${
-      refreshRate !== null ? `${refreshRate} Hz` : "Not specified"
+      refreshRate !== null
+        ? `${refreshRate} Hz`
+        : "Not specified"
     }
 - Workloads / Use Cases: ${workloadText}
 ${gpuModel ? `- Paired GPU: ${gpuModel}` : ""}
@@ -215,7 +246,8 @@ WORKLOAD PRIORITIES:
   affecting GPU importance.
 
 - AI / Machine Learning:
-  For GPUs, prioritize VRAM and compute capability.
+  For GPUs, prioritize VRAM and compute capability when those
+  specifications are available.
   For CPUs, prioritize thread count and relevant instruction support.
 
 - 3D Rendering:
@@ -232,6 +264,29 @@ WORKLOAD PRIORITIES:
 
 - General Use:
   Favor good value and avoid unnecessary overkill.
+
+CPU-SPECIFIC INFORMATION:
+
+When recommending CPUs, use the supplied:
+- Socket
+- Cores/Threads
+- Boost Clock
+- TDP
+- Cinebench R23 Multi-Core benchmark
+
+Cinebench R23 Multi-Core is an important indicator of multi-core
+performance for workloads such as rendering, content creation,
+workstation workloads and heavy multitasking.
+
+GPU-SPECIFIC INFORMATION:
+
+The current GPU database provides:
+- Brand
+- Product name
+- Price
+
+Do not invent GPU specifications that are not present in the supplied
+product data.
 
 RANKING PRIORITIES:
 
@@ -292,7 +347,10 @@ Do not invent IDs.
       console.error("GROQ_API_KEY is missing.");
 
       return NextResponse.json(
-        { rankedIds: [], error: "GROQ_API_KEY is missing." },
+        {
+          rankedIds: [],
+          error: "GROQ_API_KEY is missing.",
+        },
         { status: 500 }
       );
     }
@@ -364,16 +422,6 @@ Do not invent IDs.
 
     /*
      * CLEAN GROQ JSON
-     *
-     * Handles:
-     *
-     * [1,2,3]
-     *
-     * and:
-     *
-     * ```json
-     * [1,2,3]
-     * ```
      */
 
     let cleanedContent = rawContent.trim();
@@ -431,6 +479,11 @@ Do not invent IDs.
 
     /*
      * VALIDATE IDS
+     *
+     * This is category-independent.
+     *
+     * CPU IDs and GPU IDs are allowed to overlap because
+     * the valid ID set comes from the currently selected table.
      */
 
     const validIdSet = new Set(validIds);
@@ -443,7 +496,9 @@ Do not invent IDs.
      * REMOVE DUPLICATES
      */
 
-    const uniqueRankedIds = Array.from(new Set(rankedIds));
+    const uniqueRankedIds = Array.from(
+      new Set(rankedIds)
+    );
 
     console.log("FINAL RANKED IDS:");
     console.log(uniqueRankedIds);
@@ -452,7 +507,10 @@ Do not invent IDs.
       rankedIds: uniqueRankedIds,
     });
   } catch (error) {
-    console.error("RECOMMENDATION API ERROR:", error);
+    console.error(
+      "RECOMMENDATION API ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
