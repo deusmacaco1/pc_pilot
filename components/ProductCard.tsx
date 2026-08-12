@@ -7,6 +7,10 @@ product_url: string;
 retailer: string;
 brand?: string;
 
+bestbuy_url?: string;
+memoryexpress_url?: string;
+amazon_url?: string;
+
 cpu_cores_threads?: string;
 cpu_boost_clock?: string;
 cpu_tdp?: string;
@@ -187,27 +191,59 @@ return ( <div className="group bg-[#111111] border border-[#222222] rounded-xl o
       </span>
     </div>
 
-    {/* Retailer Link */}
-    <a
-      href={product.product_url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-lg bg-white text-black hover:bg-[#e0e0e0] transition-colors duration-200"
-    >
-      <img
-  src="/newegg-logo.svg"
-  alt="Newegg"
-  className="h-5 w-auto object-contain"
-/>
+    {/* Retailer Links */}
+    <div className="flex flex-col gap-2">
+      {[
+        {
+          url: product.product_url,
+          label: product.retailer || "Newegg",
+          logo: "/newegg-logo.svg",
+          alt: "Newegg",
+        },
+        {
+          url: product.bestbuy_url,
+          label: "Best Buy",
+          logo: "/bestbuy-logo.svg",
+          alt: "Best Buy",
+        },
+        {
+          url: product.memoryexpress_url,
+          label: "Memory Express",
+          logo: "/memoryexpress-logo.svg",
+          alt: "Memory Express",
+        },
+        {
+          url: product.amazon_url,
+          label: "Amazon",
+          logo: "/amazon-logo.svg",
+          alt: "Amazon",
+        },
+      ]
+        .filter((retailerLink) => retailerLink.url)
+        .map((retailerLink) => (
+          <a
+            key={retailerLink.label}
+            href={retailerLink.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-lg bg-white text-black hover:bg-[#e0e0e0] transition-colors duration-200"
+          >
+            <img
+              src={retailerLink.logo}
+              alt={retailerLink.alt}
+              className="h-5 w-auto object-contain"
+            />
 
-      <span>
-        Link to {product.retailer || "Newegg"}
-      </span>
+            <span>
+              Link to {retailerLink.label}
+            </span>
 
-      <span className="text-xs">
-        ↗
-      </span>
-    </a>
+            <span className="text-xs">
+              ↗
+            </span>
+          </a>
+        ))}
+    </div>
 
   </div>
 </div>
